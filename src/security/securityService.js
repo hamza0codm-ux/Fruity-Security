@@ -39,14 +39,21 @@ const nukeActions = new Map();
 |--------------------------------------------------------------------------
 */
 
-function getKey(guildId, userId) {
+function getKey(
+    guildId,
+    userId,
+) {
     return `${guildId}:${userId}`;
 }
 
 
-function cleanupArray(array, cutoff) {
+function cleanupArray(
+    array,
+    cutoff,
+) {
     return array.filter(
-        (timestamp) => timestamp >= cutoff,
+        (timestamp) =>
+            timestamp >= cutoff,
     );
 }
 
@@ -62,9 +69,11 @@ export function isIncidentActive(
     userId,
     type,
 ) {
-    const key = `${guildId}:${userId}:${type}`;
+    const key =
+        `${guildId}:${userId}:${type}`;
 
-    const expires = incidentCooldowns.get(key);
+    const expires =
+        incidentCooldowns.get(key);
 
     if (!expires) {
         return false;
@@ -72,6 +81,7 @@ export function isIncidentActive(
 
     if (expires <= Date.now()) {
         incidentCooldowns.delete(key);
+
         return false;
     }
 
@@ -98,7 +108,9 @@ export function startIncidentCooldown(
 |--------------------------------------------------------------------------
 */
 
-export async function handleMessage(message) {
+export async function handleMessage(
+    message,
+) {
     if (!message.guild) {
         return;
     }
@@ -107,9 +119,10 @@ export async function handleMessage(message) {
         return;
     }
 
-    const config = await getGuildConfig(
-        message.guild.id,
-    );
+    const config =
+        await getGuildConfig(
+            message.guild.id,
+        );
 
     if (!config?.enabled) {
         return;
@@ -124,15 +137,25 @@ export async function handleMessage(message) {
         return;
     }
 
-    await checkDiscordInvite(message);
+    await checkDiscordInvite(
+        message,
+    );
 
-    await checkPhishing(message);
+    await checkPhishing(
+        message,
+    );
 
-    await checkSpam(message);
+    await checkSpam(
+        message,
+    );
 
-    await checkIdenticalSpam(message);
+    await checkIdenticalSpam(
+        message,
+    );
 
-    await checkMentionSpam(message);
+    await checkMentionSpam(
+        message,
+    );
 }
 
 
@@ -142,7 +165,9 @@ export async function handleMessage(message) {
 |--------------------------------------------------------------------------
 */
 
-async function safeDelete(message) {
+async function safeDelete(
+    message,
+) {
     try {
         if (message.deletable) {
             await message.delete();
@@ -157,13 +182,6 @@ async function safeDelete(message) {
 |--------------------------------------------------------------------------
 | Safe Timeout
 |--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| We do NOT check the TARGET'S permissions here.
-|
-| member.moderatable already checks whether the bot can
-| actually moderate the member.
-|
 */
 
 async function safeTimeout(
@@ -198,6 +216,7 @@ async function safeTimeout(
         );
 
         return true;
+
     } catch (error) {
         console.error(
             `Timeout failed for ${member.user?.tag || member.id}:`,
@@ -215,7 +234,9 @@ async function safeTimeout(
 |--------------------------------------------------------------------------
 */
 
-function hasDiscordInvite(content) {
+function hasDiscordInvite(
+    content,
+) {
     return /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord\.com\/invite|discordapp\.com\/invite)\/[A-Za-z0-9-]+/i.test(
         content,
     );
@@ -224,14 +245,17 @@ function hasDiscordInvite(content) {
 
 /*
 |--------------------------------------------------------------------------
-| Phishing Link Detection
+| Phishing Detection
 |--------------------------------------------------------------------------
 */
 
-function hasSuspiciousLink(content) {
-    const urlMatches = content.match(
-        /https?:\/\/[^\s<]+/gi,
-    );
+function hasSuspiciousLink(
+    content,
+) {
+    const urlMatches =
+        content.match(
+            /https?:\/\/[^\s<]+/gi,
+        );
 
     if (!urlMatches) {
         return false;
@@ -251,10 +275,14 @@ function hasSuspiciousLink(content) {
         'disсord',
     ];
 
-    return urlMatches.some((url) =>
-        suspiciousPatterns.some((pattern) =>
-            url.toLowerCase().includes(pattern),
-        ),
+    return urlMatches.some(
+        (url) =>
+            suspiciousPatterns.some(
+                (pattern) =>
+                    url
+                        .toLowerCase()
+                        .includes(pattern),
+            ),
     );
 }
 
@@ -265,13 +293,22 @@ function hasSuspiciousLink(content) {
 |--------------------------------------------------------------------------
 */
 
-async function checkDiscordInvite(message) {
-    if (!hasDiscordInvite(message.content)) {
+async function checkDiscordInvite(
+    message,
+) {
+    if (
+        !hasDiscordInvite(
+            message.content,
+        )
+    ) {
         return;
     }
 
-    const guildId = message.guild.id;
-    const userId = message.author.id;
+    const guildId =
+        message.guild.id;
+
+    const userId =
+        message.author.id;
 
     if (
         isIncidentActive(
@@ -280,7 +317,10 @@ async function checkDiscordInvite(message) {
             'discord_invite',
         )
     ) {
-        await safeDelete(message);
+        await safeDelete(
+            message,
+        );
+
         return;
     }
 
@@ -291,35 +331,55 @@ async function checkDiscordInvite(message) {
         SECURITY_CONFIG.phishing.incidentCooldownMs,
     );
 
-    await safeDelete(message);
-
-    const member = message.member;
-
-    const timedOut = member
-        ? await safeTimeout(
-            member,
-            SECURITY_CONFIG.phishing.timeoutMs,
-            'Fruity Security: Discord invite link',
-        )
-        : false;
-
-    await incrementCase(
-        guildId,
-        'phishing',
+    await safeDelete(
+        message,
     );
+
+    const member =
+        message.member;
+
+    const timedOut =
+        member
+            ? await safeTimeout(
+                member,
+                SECURITY_CONFIG.phishing.timeoutMs,
+                'Fruity Security: Discord invite link',
+            )
+            : false;
+
+
+    const caseData =
+        await incrementCase(
+            guildId,
+            'phishing',
+            userId,
+        );
+
 
     await sendAutomaticSecurityLog({
         guild: message.guild,
+
         type: '🔗 Anti-Discord Invite',
+
         user: message.author,
-        reason: 'Discord invite link detected.',
+
+        reason:
+            'Discord invite link detected.',
+
         details: [
             `Channel: ${message.channel}`,
             'Message deleted: Yes',
         ],
+
         action: timedOut
             ? `⏰ Automatically timed out for ${SECURITY_CONFIG.phishing.timeoutMs / 60000} minutes.`
             : '⚠️ Could not automatically timeout the user.',
+
+        caseNumber:
+            caseData.caseNumber,
+
+        userFlagCount:
+            caseData.userFlagCount,
     });
 }
 
@@ -330,13 +390,22 @@ async function checkDiscordInvite(message) {
 |--------------------------------------------------------------------------
 */
 
-async function checkPhishing(message) {
-    if (!hasSuspiciousLink(message.content)) {
+async function checkPhishing(
+    message,
+) {
+    if (
+        !hasSuspiciousLink(
+            message.content,
+        )
+    ) {
         return;
     }
 
-    const guildId = message.guild.id;
-    const userId = message.author.id;
+    const guildId =
+        message.guild.id;
+
+    const userId =
+        message.author.id;
 
     if (
         isIncidentActive(
@@ -345,7 +414,10 @@ async function checkPhishing(message) {
             'phishing',
         )
     ) {
-        await safeDelete(message);
+        await safeDelete(
+            message,
+        );
+
         return;
     }
 
@@ -356,33 +428,52 @@ async function checkPhishing(message) {
         SECURITY_CONFIG.phishing.incidentCooldownMs,
     );
 
-    await safeDelete(message);
-
-    const timedOut = message.member
-        ? await safeTimeout(
-            message.member,
-            SECURITY_CONFIG.phishing.timeoutMs,
-            'Fruity Security: Suspicious/phishing link',
-        )
-        : false;
-
-    await incrementCase(
-        guildId,
-        'phishing',
+    await safeDelete(
+        message,
     );
+
+    const timedOut =
+        message.member
+            ? await safeTimeout(
+                message.member,
+                SECURITY_CONFIG.phishing.timeoutMs,
+                'Fruity Security: Suspicious/phishing link',
+            )
+            : false;
+
+
+    const caseData =
+        await incrementCase(
+            guildId,
+            'phishing',
+            userId,
+        );
+
 
     await sendAutomaticSecurityLog({
         guild: message.guild,
+
         type: '🔗 Anti-Phishing',
+
         user: message.author,
-        reason: 'Suspicious/phishing link detected.',
+
+        reason:
+            'Suspicious/phishing link detected.',
+
         details: [
             `Channel: ${message.channel}`,
             'Message deleted: Yes',
         ],
+
         action: timedOut
             ? '⏰ User automatically timed out.'
             : '⚠️ Timeout could not be applied.',
+
+        caseNumber:
+            caseData.caseNumber,
+
+        userFlagCount:
+            caseData.userFlagCount,
     });
 }
 
@@ -393,21 +484,27 @@ async function checkPhishing(message) {
 |--------------------------------------------------------------------------
 */
 
-async function checkSpam(message) {
-    const key = getKey(
-        message.guild.id,
-        message.author.id,
-    );
+async function checkSpam(
+    message,
+) {
+    const key =
+        getKey(
+            message.guild.id,
+            message.author.id,
+        );
 
-    const now = Date.now();
+    const now =
+        Date.now();
 
     const history =
         messageHistory.get(key) || [];
 
-    const recent = cleanupArray(
-        history,
-        now - SECURITY_CONFIG.spam.messageWindowMs,
-    );
+    const recent =
+        cleanupArray(
+            history,
+            now -
+                SECURITY_CONFIG.spam.messageWindowMs,
+        );
 
     recent.push(now);
 
@@ -430,7 +527,10 @@ async function checkSpam(message) {
             'spam',
         )
     ) {
-        await safeDelete(message);
+        await safeDelete(
+            message,
+        );
+
         return;
     }
 
@@ -441,73 +541,103 @@ async function checkSpam(message) {
         SECURITY_CONFIG.spam.incidentCooldownMs,
     );
 
-    const messageCount = recent.length;
+    const messageCount =
+        recent.length;
 
-    await safeDelete(message);
-
-    const timedOut = message.member
-        ? await safeTimeout(
-            message.member,
-            SECURITY_CONFIG.spam.timeoutMs,
-            'Fruity Security: Message spam',
-        )
-        : false;
-
-    await incrementCase(
-        message.guild.id,
-        'spam',
+    await safeDelete(
+        message,
     );
+
+    const timedOut =
+        message.member
+            ? await safeTimeout(
+                message.member,
+                SECURITY_CONFIG.spam.timeoutMs,
+                'Fruity Security: Message spam',
+            )
+            : false;
+
+
+    const caseData =
+        await incrementCase(
+            message.guild.id,
+            'spam',
+            message.author.id,
+        );
+
 
     await sendAutomaticSecurityLog({
         guild: message.guild,
+
         type: '💬 Anti-Spam',
+
         user: message.author,
-        reason: 'Message spam detected.',
+
+        reason:
+            'Message spam detected.',
+
         details: [
             `${messageCount} messages detected in 5 seconds.`,
             `Limit: ${SECURITY_CONFIG.spam.messageLimit} messages / 5 seconds.`,
             `Channel: ${message.channel}`,
             'Spam messages deleted.',
         ],
+
         action: timedOut
             ? `⏰ Automatically timed out for ${SECURITY_CONFIG.spam.timeoutMs / 60000} minutes.`
             : '⚠️ Timeout could not be applied.',
+
+        caseNumber:
+            caseData.caseNumber,
+
+        userFlagCount:
+            caseData.userFlagCount,
     });
 
-    messageHistory.delete(key);
+
+    messageHistory.delete(
+        key,
+    );
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Identical Message Spam
+| Identical Spam
 |--------------------------------------------------------------------------
 */
 
-async function checkIdenticalSpam(message) {
-    const key = getKey(
-        message.guild.id,
-        message.author.id,
-    );
+async function checkIdenticalSpam(
+    message,
+) {
+    const key =
+        getKey(
+            message.guild.id,
+            message.author.id,
+        );
 
-    const content = message.content
-        .trim()
-        .toLowerCase();
+    const content =
+        message.content
+            .trim()
+            .toLowerCase();
 
     if (!content) {
         return;
     }
 
-    const now = Date.now();
+    const now =
+        Date.now();
 
     const history =
         identicalHistory.get(key) || [];
 
-    const recent = history.filter(
-        (entry) =>
-            entry.timestamp >=
-            now - SECURITY_CONFIG.spam.identicalWindowMs,
-    );
+    const recent =
+        history.filter(
+            (entry) =>
+                entry.timestamp >=
+                now -
+                    SECURITY_CONFIG.spam.identicalWindowMs,
+        );
 
     recent.push({
         content,
@@ -521,7 +651,8 @@ async function checkIdenticalSpam(message) {
 
     const identicalCount =
         recent.filter(
-            (entry) => entry.content === content,
+            (entry) =>
+                entry.content === content,
         ).length;
 
     if (
@@ -538,7 +669,10 @@ async function checkIdenticalSpam(message) {
             'identical_spam',
         )
     ) {
-        await safeDelete(message);
+        await safeDelete(
+            message,
+        );
+
         return;
     }
 
@@ -549,37 +683,59 @@ async function checkIdenticalSpam(message) {
         SECURITY_CONFIG.spam.incidentCooldownMs,
     );
 
-    await safeDelete(message);
-
-    const timedOut = message.member
-        ? await safeTimeout(
-            message.member,
-            SECURITY_CONFIG.spam.timeoutMs,
-            'Fruity Security: Repeated identical messages',
-        )
-        : false;
-
-    await incrementCase(
-        message.guild.id,
-        'spam',
+    await safeDelete(
+        message,
     );
+
+    const timedOut =
+        message.member
+            ? await safeTimeout(
+                message.member,
+                SECURITY_CONFIG.spam.timeoutMs,
+                'Fruity Security: Repeated identical messages',
+            )
+            : false;
+
+
+    const caseData =
+        await incrementCase(
+            message.guild.id,
+            'spam',
+            message.author.id,
+        );
+
 
     await sendAutomaticSecurityLog({
         guild: message.guild,
+
         type: '💬 Anti-Spam',
+
         user: message.author,
-        reason: 'Repeated identical messages detected.',
+
+        reason:
+            'Repeated identical messages detected.',
+
         details: [
             `${identicalCount} identical messages in 10 seconds.`,
             `Limit: ${SECURITY_CONFIG.spam.identicalLimit} identical messages / 10 seconds.`,
             `Channel: ${message.channel}`,
         ],
+
         action: timedOut
             ? '⏰ Automatically timed out.'
             : '⚠️ Timeout could not be applied.',
+
+        caseNumber:
+            caseData.caseNumber,
+
+        userFlagCount:
+            caseData.userFlagCount,
     });
 
-    identicalHistory.delete(key);
+
+    identicalHistory.delete(
+        key,
+    );
 }
 
 
@@ -589,7 +745,9 @@ async function checkIdenticalSpam(message) {
 |--------------------------------------------------------------------------
 */
 
-async function checkMentionSpam(message) {
+async function checkMentionSpam(
+    message,
+) {
     const mentionCount =
         message.mentions.users.size +
         message.mentions.roles.size;
@@ -608,7 +766,10 @@ async function checkMentionSpam(message) {
             'mention_spam',
         )
     ) {
-        await safeDelete(message);
+        await safeDelete(
+            message,
+        );
+
         return;
     }
 
@@ -619,34 +780,53 @@ async function checkMentionSpam(message) {
         SECURITY_CONFIG.spam.incidentCooldownMs,
     );
 
-    await safeDelete(message);
-
-    const timedOut = message.member
-        ? await safeTimeout(
-            message.member,
-            SECURITY_CONFIG.spam.timeoutMs,
-            'Fruity Security: Mention spam',
-        )
-        : false;
-
-    await incrementCase(
-        message.guild.id,
-        'spam',
+    await safeDelete(
+        message,
     );
+
+    const timedOut =
+        message.member
+            ? await safeTimeout(
+                message.member,
+                SECURITY_CONFIG.spam.timeoutMs,
+                'Fruity Security: Mention spam',
+            )
+            : false;
+
+
+    const caseData =
+        await incrementCase(
+            message.guild.id,
+            'spam',
+            message.author.id,
+        );
+
 
     await sendAutomaticSecurityLog({
         guild: message.guild,
+
         type: '💬 Anti-Mention Spam',
+
         user: message.author,
-        reason: 'Excessive mentions detected.',
+
+        reason:
+            'Excessive mentions detected.',
+
         details: [
             `${mentionCount} mentions in one message.`,
             `Limit: ${SECURITY_CONFIG.spam.mentionLimit}+ mentions.`,
             `Channel: ${message.channel}`,
         ],
+
         action: timedOut
             ? '⏰ Automatically timed out.'
             : '⚠️ Timeout could not be applied.',
+
+        caseNumber:
+            caseData.caseNumber,
+
+        userFlagCount:
+            caseData.userFlagCount,
     });
 }
 
@@ -657,14 +837,17 @@ async function checkMentionSpam(message) {
 |--------------------------------------------------------------------------
 */
 
-export async function handleMemberJoin(member) {
+export async function handleMemberJoin(
+    member,
+) {
     if (!member.guild) {
         return;
     }
 
-    const config = await getGuildConfig(
-        member.guild.id,
-    );
+    const config =
+        await getGuildConfig(
+            member.guild.id,
+        );
 
     if (!config?.enabled) {
         return;
@@ -679,17 +862,22 @@ export async function handleMemberJoin(member) {
         return;
     }
 
-    const guildId = member.guild.id;
-    const now = Date.now();
+    const guildId =
+        member.guild.id;
+
+    const now =
+        Date.now();
 
     const joins =
         raidJoins.get(guildId) || [];
 
-    const recent = joins.filter(
-        (timestamp) =>
-            timestamp >=
-            now - SECURITY_CONFIG.raid.joinWindowMs,
-    );
+    const recent =
+        joins.filter(
+            (timestamp) =>
+                timestamp >=
+                now -
+                    SECURITY_CONFIG.raid.joinWindowMs,
+        );
 
     recent.push(now);
 
@@ -699,7 +887,8 @@ export async function handleMemberJoin(member) {
     );
 
     const accountAge =
-        now - member.user.createdTimestamp;
+        now -
+        member.user.createdTimestamp;
 
     const accountAgeDays =
         accountAge /
@@ -710,7 +899,9 @@ export async function handleMemberJoin(member) {
         SECURITY_CONFIG.raid.suspiciousAccountAgeDays;
 
     if (suspicious) {
-        await addSuspiciousAccount(guildId);
+        await addSuspiciousAccount(
+            guildId,
+        );
     }
 
     if (
@@ -718,6 +909,7 @@ export async function handleMemberJoin(member) {
         SECURITY_CONFIG.raid.joinLimit
     ) {
         if (!config.raid_mode) {
+
             await updateGuildConfig(
                 guildId,
                 {
@@ -725,16 +917,25 @@ export async function handleMemberJoin(member) {
                 },
             );
 
-            await incrementCase(
-                guildId,
-                'raid',
-            );
+
+            const caseData =
+                await incrementCase(
+                    guildId,
+                    'raid',
+                    member.id,
+                );
+
 
             await sendStaffActionLog({
                 guild: member.guild,
+
                 type: '🚨 Anti-Raid',
+
                 user: member.user,
-                reason: 'Possible raid detected.',
+
+                reason:
+                    'Possible raid detected.',
+
                 details: [
                     `${recent.length} joins within 10 seconds.`,
                     `Raid threshold: ${SECURITY_CONFIG.raid.joinLimit} joins / 10 seconds.`,
@@ -742,6 +943,12 @@ export async function handleMemberJoin(member) {
                         ? `Account is younger than ${SECURITY_CONFIG.raid.suspiciousAccountAgeDays} days.`
                         : 'Account age appears normal.',
                 ],
+
+                caseNumber:
+                    caseData.caseNumber,
+
+                userFlagCount:
+                    caseData.userFlagCount,
             });
         }
     }
@@ -750,16 +957,11 @@ export async function handleMemberJoin(member) {
         config.raid_mode &&
         suspicious
     ) {
-        try {
-            if (member.moderatable) {
-                await member.timeout(
-                    SECURITY_CONFIG.lockdown.timeoutMs,
-                    'Fruity Security: Suspicious account during raid mode',
-                );
-            }
-        } catch {
-            // Ignore moderation failure.
-        }
+        await safeTimeout(
+            member,
+            SECURITY_CONFIG.lockdown.timeoutMs,
+            'Fruity Security: Suspicious account during raid mode',
+        );
     }
 }
 
@@ -789,12 +991,14 @@ export async function handleNukeAction({
         return;
     }
 
-    const key = getKey(
-        guild.id,
-        userId,
-    );
+    const key =
+        getKey(
+            guild.id,
+            userId,
+        );
 
-    const now = Date.now();
+    const now =
+        Date.now();
 
     const history =
         nukeActions.get(key) || [];
@@ -803,7 +1007,8 @@ export async function handleNukeAction({
         history.filter(
             (entry) =>
                 entry.timestamp >=
-                now - SECURITY_CONFIG.antiNuke.actionWindowMs,
+                now -
+                    SECURITY_CONFIG.antiNuke.actionWindowMs,
         );
 
     recent.push({
@@ -841,21 +1046,24 @@ export async function handleNukeAction({
         60_000,
     );
 
-    await incrementCase(
-        guild.id,
-        'nuke',
-    );
 
     const member =
         await guild.members
             .fetch(userId)
             .catch(() => null);
 
+
     let removedRoles = 0;
+
     let timedOut = false;
 
+
     if (member) {
-        for (const role of member.roles.cache.values()) {
+
+        for (
+            const role
+            of member.roles.cache.values()
+        ) {
             if (
                 role.id === guild.id
             ) {
@@ -875,38 +1083,68 @@ export async function handleNukeAction({
                 );
 
                 removedRoles++;
+
             } catch {
                 // Continue removing other roles.
             }
         }
 
-        timedOut = await safeTimeout(
-            member,
-            SECURITY_CONFIG.antiNuke.timeoutMs,
-            'Fruity Security: Anti-Nuke protection',
-        );
+
+        timedOut =
+            await safeTimeout(
+                member,
+                SECURITY_CONFIG.antiNuke.timeoutMs,
+                'Fruity Security: Anti-Nuke protection',
+            );
     }
+
+
+    const caseData =
+        await incrementCase(
+            guild.id,
+            'nuke',
+            userId,
+        );
+
 
     await sendAutomaticSecurityLog({
         guild,
+
         type: '☢️ Anti-Nuke',
-        user: member?.user || {
-            id: userId,
-            toString: () => `<@${userId}>`,
-        },
-        reason: 'Dangerous server activity detected.',
+
+        user:
+            member?.user || {
+                id: userId,
+
+                toString: () =>
+                    `<@${userId}>`,
+            },
+
+        reason:
+            'Dangerous server activity detected.',
+
         details: [
             `${recent.length} dangerous actions within 10 seconds.`,
             `Latest action: ${action}`,
             `Target: ${target || 'Unknown'}`,
             `Dangerous roles removed: ${removedRoles}`,
         ],
+
         action:
             `${timedOut ? '⏰ User timed out.' : '⚠️ Timeout failed.'}\n` +
             `🛡️ ${removedRoles} dangerous roles removed.`,
+
+        caseNumber:
+            caseData.caseNumber,
+
+        userFlagCount:
+            caseData.userFlagCount,
     });
 
-    nukeActions.delete(key);
+
+    nukeActions.delete(
+        key,
+    );
 }
 
 
@@ -916,7 +1154,9 @@ export async function handleNukeAction({
 |--------------------------------------------------------------------------
 */
 
-export async function lockdownGuild(guild) {
+export async function lockdownGuild(
+    guild,
+) {
     await updateGuildConfig(
         guild.id,
         {
@@ -926,7 +1166,10 @@ export async function lockdownGuild(guild) {
 
     let changed = 0;
 
-    for (const channel of guild.channels.cache.values()) {
+    for (
+        const channel
+        of guild.channels.cache.values()
+    ) {
         try {
             if (
                 channel.isTextBased() &&
@@ -942,12 +1185,14 @@ export async function lockdownGuild(guild) {
                         SendMessages: false,
                     },
                     {
-                        reason: 'Fruity Security lockdown',
+                        reason:
+                            'Fruity Security lockdown',
                     },
                 );
 
                 changed++;
             }
+
         } catch {
             // Ignore channels the bot cannot modify.
         }
@@ -963,7 +1208,9 @@ export async function lockdownGuild(guild) {
 |--------------------------------------------------------------------------
 */
 
-export async function unlockGuild(guild) {
+export async function unlockGuild(
+    guild,
+) {
     await updateGuildConfig(
         guild.id,
         {
@@ -973,7 +1220,10 @@ export async function unlockGuild(guild) {
 
     let changed = 0;
 
-    for (const channel of guild.channels.cache.values()) {
+    for (
+        const channel
+        of guild.channels.cache.values()
+    ) {
         try {
             if (
                 channel.isTextBased()
@@ -984,12 +1234,14 @@ export async function unlockGuild(guild) {
                         SendMessages: null,
                     },
                     {
-                        reason: 'Fruity Security lockdown removed',
+                        reason:
+                            'Fruity Security lockdown removed',
                     },
                 );
 
                 changed++;
             }
+
         } catch {
             // Ignore channels the bot cannot modify.
         }
@@ -1005,14 +1257,22 @@ export async function unlockGuild(guild) {
 |--------------------------------------------------------------------------
 */
 
-export async function scanGuild(guild) {
+export async function scanGuild(
+    guild,
+) {
     const problems = [];
 
     let dangerousRoles = 0;
+
     let dangerousPermissions = 0;
+
     let bots = 0;
 
-    for (const role of guild.roles.cache.values()) {
+
+    for (
+        const role
+        of guild.roles.cache.values()
+    ) {
         if (
             role.id === guild.id ||
             role.managed
@@ -1042,7 +1302,11 @@ export async function scanGuild(guild) {
         }
     }
 
-    for (const role of guild.roles.cache.values()) {
+
+    for (
+        const role
+        of guild.roles.cache.values()
+    ) {
         if (
             role.permissions.has(
                 PermissionFlagsBits.Administrator,
@@ -1056,14 +1320,20 @@ export async function scanGuild(guild) {
         }
     }
 
+
     const members =
         await guild.members.fetch();
 
-    for (const member of members.values()) {
+
+    for (
+        const member
+        of members.values()
+    ) {
         if (member.user.bot) {
             bots++;
         }
     }
+
 
     return {
         rolesChecked:
