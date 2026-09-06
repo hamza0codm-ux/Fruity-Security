@@ -5,31 +5,37 @@ import {
     EmbedBuilder,
 } from 'discord.js';
 
-import { SECURITY_CONFIG } from './securityConfig.js';
-import { getGuildConfig } from '../database/database.js';
+import {
+    getGuildConfig,
+} from '../database/database.js';
 
-function truncate(value, max = 900) {
-    if (!value) {
-        return 'None';
-    }
+import {
+    SECURITY_CONFIG,
+} from './securityConfig.js';
 
-    const text = String(value);
 
-    if (text.length <= max) {
-        return text;
-    }
+/*
+|--------------------------------------------------------------------------
+| Get Security Log Channel
+|--------------------------------------------------------------------------
+*/
 
-    return `${text.slice(0, max - 3)}...`;
-}
-
-export async function getSecurityLogChannel(guild) {
-    const config = await getGuildConfig(guild.id);
+export async function getSecurityLogChannel(
+    guild,
+) {
+    const config =
+        await getGuildConfig(guild.id);
 
     const channelId =
         config?.log_channel_id ||
         SECURITY_CONFIG.logChannelId;
 
-    const channel = guild.channels.cache.get(channelId);
+    if (!channelId) {
+        return null;
+    }
+
+    const channel =
+        guild.channels.cache.get(channelId);
 
     if (!channel) {
         return null;
@@ -38,6 +44,31 @@ export async function getSecurityLogChannel(guild) {
     return channel;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Format Case Number
+|--------------------------------------------------------------------------
+*/
+
+function formatCaseNumber(caseNumber) {
+    if (!caseNumber) {
+        return '----';
+    }
+
+    return String(caseNumber).padStart(
+        4,
+        '0',
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Automatic Security Log
+|--------------------------------------------------------------------------
+*/
+
 export async function sendAutomaticSecurityLog({
     guild,
     type,
@@ -45,49 +76,79 @@ export async function sendAutomaticSecurityLog({
     reason,
     details = [],
     action,
+    caseNumber = null,
+    userFlagCount = null,
 }) {
-    const channel = await getSecurityLogChannel(guild);
+    const channel =
+        await getSecurityLogChannel(guild);
 
     if (!channel) {
+        console.error(
+            `❌ Security log channel not found for ${guild.name}.`,
+        );
+
         return null;
     }
 
-    const embed = new EmbedBuilder()
-        .setTitle('🚨 SECURITY ALERT')
-        .setDescription(`### ${type}`)
-        .addFields(
-            {
-                name: '👤 User',
-                value: `${user} \`${user.id}\``,
-                inline: false,
-            },
-            {
-                name: '⚠️ Reason',
-                value: truncate(reason),
-                inline: false,
-            },
-            {
-                name: '🛡️ Automatic Protection',
-                value: action,
-                inline: false,
-            },
-        )
-        .setTimestamp();
 
-    if (details.length) {
-        embed.addFields({
-            name: '📋 Details',
-            value: details
-                .map((item) => `• ${truncate(item, 800)}`)
-                .join('\n'),
-            inline: false,
-        });
-    }
+    const embed =
+        new EmbedBuilder()
+            .setTitle(
+                '🚨 SECURITY ALERT',
+            )
+            .setDescription(
+                [
+                    `### Case #${formatCaseNumber(caseNumber)}`,
+
+                    '',
+
+                    `👤 **User**`,
+                    `${user}`,
+
+                    '',
+
+                    `⚠️ **Security Flags**`,
+                    userFlagCount !== null
+                        ? `**${userFlagCount} total flag${userFlagCount === 1 ? '' : 's'}**`
+                        : 'Unknown',
+
+                    '',
+
+                    `🛡️ **Detection**`,
+                    type,
+
+                    '',
+
+                    `📋 **Reason**`,
+                    reason,
+
+                    '',
+                    details.length
+                        ? details.join('\n')
+                        : '',
+
+                    '',
+
+                    `⏰ **Action**`,
+                    action || 'No action recorded.',
+                ].join('\n'),
+            )
+            .setTimestamp();
+
 
     return channel.send({
-        embeds: [embed],
+        embeds: [
+            embed,
+        ],
     });
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Staff Action Security Log
+|--------------------------------------------------------------------------
+*/
 
 export async function sendStaffActionLog({
     guild,
@@ -95,67 +156,117 @@ export async function sendStaffActionLog({
     user,
     reason,
     details = [],
+    caseNumber = null,
+    userFlagCount = null,
 }) {
-    const channel = await getSecurityLogChannel(guild);
+    const channel =
+        await getSecurityLogChannel(guild);
 
     if (!channel) {
+        console.error(
+            `❌ Security log channel not found for ${guild.name}.`,
+        );
+
         return null;
     }
 
-    const embed = new EmbedBuilder()
-        .setTitle('🚨 SECURITY ALERT')
-        .setDescription(`### ${type}`)
-        .addFields(
-            {
-                name: '👤 User',
-                value: `${user} \`${user.id}\``,
-                inline: false,
-            },
-            {
-                name: '⚠️ Reason',
-                value: truncate(reason),
-                inline: false,
-            },
-        )
-        .setTimestamp();
 
-    if (details.length) {
-        embed.addFields({
-            name: '📋 Details',
-            value: details
-                .map((item) => `• ${truncate(item, 800)}`)
-                .join('\n'),
-            inline: false,
-        });
-    }
+    const userId =
+        user?.id || 'unknown';
 
-    const buttons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`security_timeout:${user.id}`)
-            .setLabel('Timeout')
-            .setEmoji('⏰')
-            .setStyle(ButtonStyle.Secondary),
 
-        new ButtonBuilder()
-            .setCustomId(`security_kick:${user.id}`)
-            .setLabel('Kick')
-            .setEmoji('🔨')
-            .setStyle(ButtonStyle.Danger),
+    const embed =
+        new EmbedBuilder()
+            .setTitle(
+                '🚨 SECURITY ALERT',
+            )
+            .setDescription(
+                [
+                    `### Case #${formatCaseNumber(caseNumber)}`,
 
-        new ButtonBuilder()
-            .setCustomId(`security_ban:${user.id}`)
-            .setLabel('Ban')
-            .setEmoji('⛔')
-            .setStyle(ButtonStyle.Danger),
+                    '',
 
-        new ButtonBuilder()
-            .setCustomId(`security_dismiss:${user.id}`)
-            .setLabel('Dismiss')
-            .setStyle(ButtonStyle.Secondary),
-    );
+                    `👤 **User**`,
+                    `${user}`,
+
+                    '',
+
+                    `⚠️ **Security Flags**`,
+                    userFlagCount !== null
+                        ? `**${userFlagCount} total flag${userFlagCount === 1 ? '' : 's'}**`
+                        : 'Unknown',
+
+                    '',
+
+                    `🛡️ **Detection**`,
+                    type,
+
+                    '',
+
+                    `📋 **Reason**`,
+                    reason,
+
+                    '',
+                    details.length
+                        ? details.join('\n')
+                        : '',
+                ].join('\n'),
+            )
+            .setTimestamp();
+
+
+    const row =
+        new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(
+                        `security_timeout:${userId}`,
+                    )
+                    .setLabel('Timeout')
+                    .setEmoji('⏰')
+                    .setStyle(
+                        ButtonStyle.Secondary,
+                    ),
+
+                new ButtonBuilder()
+                    .setCustomId(
+                        `security_kick:${userId}`,
+                    )
+                    .setLabel('Kick')
+                    .setEmoji('🔨')
+                    .setStyle(
+                        ButtonStyle.Danger,
+                    ),
+
+                new ButtonBuilder()
+                    .setCustomId(
+                        `security_ban:${userId}`,
+                    )
+                    .setLabel('Ban')
+                    .setEmoji('⛔')
+                    .setStyle(
+                        ButtonStyle.Danger,
+                    ),
+
+                new ButtonBuilder()
+                    .setCustomId(
+                        `security_dismiss:${userId}`,
+                    )
+                    .setLabel('Dismiss')
+                    .setEmoji('✖️')
+                    .setStyle(
+                        ButtonStyle.Secondary,
+                    ),
+            );
+
 
     return channel.send({
-        embeds: [embed],
-        components: [buttons],
+        embeds: [
+            embed,
+        ],
+
+        components: [
+            row,
+        ],
     });
 }
