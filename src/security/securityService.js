@@ -19,21 +19,49 @@ import {
     sendStaffActionLog,
 } from './securityLogger.js';
 
+
+/*
+|--------------------------------------------------------------------------
+| In-Memory Tracking
+|--------------------------------------------------------------------------
+*/
+
 const messageHistory = new Map();
 const identicalHistory = new Map();
 const incidentCooldowns = new Map();
 const raidJoins = new Map();
 const nukeActions = new Map();
 
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
 function getKey(guildId, userId) {
     return `${guildId}:${userId}`;
 }
 
+
 function cleanupArray(array, cutoff) {
-    return array.filter((timestamp) => timestamp >= cutoff);
+    return array.filter(
+        (timestamp) => timestamp >= cutoff,
+    );
 }
 
-export function isIncidentActive(guildId, userId, type) {
+
+/*
+|--------------------------------------------------------------------------
+| Incident Cooldowns
+|--------------------------------------------------------------------------
+*/
+
+export function isIncidentActive(
+    guildId,
+    userId,
+    type,
+) {
     const key = `${guildId}:${userId}:${type}`;
 
     const expires = incidentCooldowns.get(key);
@@ -50,6 +78,7 @@ export function isIncidentActive(guildId, userId, type) {
     return true;
 }
 
+
 export function startIncidentCooldown(
     guildId,
     userId,
@@ -62,6 +91,13 @@ export function startIncidentCooldown(
     );
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Message Handler
+|--------------------------------------------------------------------------
+*/
+
 export async function handleMessage(message) {
     if (!message.guild) {
         return;
@@ -71,7 +107,9 @@ export async function handleMessage(message) {
         return;
     }
 
-    const config = await getGuildConfig(message.guild.id);
+    const config = await getGuildConfig(
+        message.guild.id,
+    );
 
     if (!config?.enabled) {
         return;
@@ -97,6 +135,13 @@ export async function handleMessage(message) {
     await checkMentionSpam(message);
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Safe Delete
+|--------------------------------------------------------------------------
+*/
+
 async function safeDelete(message) {
     try {
         if (message.deletable) {
@@ -107,28 +152,81 @@ async function safeDelete(message) {
     }
 }
 
-async function safeTimeout(member, duration, reason) {
+
+/*
+|--------------------------------------------------------------------------
+| Safe Timeout
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| We do NOT check the TARGET'S permissions here.
+|
+| member.moderatable already checks whether the bot can
+| actually moderate the member.
+|
+*/
+
+async function safeTimeout(
+    member,
+    duration,
+    reason,
+) {
     try {
-        if (
-            member.moderatable &&
-            member.permissions.has(PermissionFlagsBits.ModerateMembers)
-        ) {
-            await member.timeout(duration, reason);
+        if (!member) {
+            console.error(
+                'Timeout failed: member is missing.',
+            );
 
-            return true;
+            return false;
         }
-    } catch (error) {
-        console.error('Timeout failed:', error);
-    }
 
-    return false;
+        if (!member.moderatable) {
+            console.error(
+                `Timeout failed: ${member.user?.tag || member.id} is not moderatable by the bot.`,
+            );
+
+            return false;
+        }
+
+        await member.timeout(
+            duration,
+            reason,
+        );
+
+        console.log(
+            `⏰ Timed out ${member.user?.tag || member.id} for ${duration / 60000} minutes.`,
+        );
+
+        return true;
+    } catch (error) {
+        console.error(
+            `Timeout failed for ${member.user?.tag || member.id}:`,
+            error,
+        );
+
+        return false;
+    }
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Discord Invite Detection
+|--------------------------------------------------------------------------
+*/
 
 function hasDiscordInvite(content) {
     return /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord\.com\/invite|discordapp\.com\/invite)\/[A-Za-z0-9-]+/i.test(
         content,
     );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Phishing Link Detection
+|--------------------------------------------------------------------------
+*/
 
 function hasSuspiciousLink(content) {
     const urlMatches = content.match(
@@ -159,6 +257,13 @@ function hasSuspiciousLink(content) {
         ),
     );
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Anti Discord Invite
+|--------------------------------------------------------------------------
+*/
 
 async function checkDiscordInvite(message) {
     if (!hasDiscordInvite(message.content)) {
@@ -198,7 +303,10 @@ async function checkDiscordInvite(message) {
         )
         : false;
 
-    await incrementCase(guildId, 'phishing');
+    await incrementCase(
+        guildId,
+        'phishing',
+    );
 
     await sendAutomaticSecurityLog({
         guild: message.guild,
@@ -207,13 +315,20 @@ async function checkDiscordInvite(message) {
         reason: 'Discord invite link detected.',
         details: [
             `Channel: ${message.channel}`,
-            `Message deleted: Yes`,
+            'Message deleted: Yes',
         ],
         action: timedOut
             ? `⏰ Automatically timed out for ${SECURITY_CONFIG.phishing.timeoutMs / 60000} minutes.`
             : '⚠️ Could not automatically timeout the user.',
     });
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Anti Phishing
+|--------------------------------------------------------------------------
+*/
 
 async function checkPhishing(message) {
     if (!hasSuspiciousLink(message.content)) {
@@ -271,6 +386,13 @@ async function checkPhishing(message) {
     });
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Anti Spam
+|--------------------------------------------------------------------------
+*/
+
 async function checkSpam(message) {
     const key = getKey(
         message.guild.id,
@@ -289,7 +411,10 @@ async function checkSpam(message) {
 
     recent.push(now);
 
-    messageHistory.set(key, recent);
+    messageHistory.set(
+        key,
+        recent,
+    );
 
     if (
         recent.length <
@@ -351,6 +476,13 @@ async function checkSpam(message) {
 
     messageHistory.delete(key);
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Identical Message Spam
+|--------------------------------------------------------------------------
+*/
 
 async function checkIdenticalSpam(message) {
     const key = getKey(
@@ -450,6 +582,13 @@ async function checkIdenticalSpam(message) {
     identicalHistory.delete(key);
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Mention Spam
+|--------------------------------------------------------------------------
+*/
+
 async function checkMentionSpam(message) {
     const mentionCount =
         message.mentions.users.size +
@@ -510,6 +649,13 @@ async function checkMentionSpam(message) {
             : '⚠️ Timeout could not be applied.',
     });
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Anti Raid
+|--------------------------------------------------------------------------
+*/
 
 export async function handleMemberJoin(member) {
     if (!member.guild) {
@@ -605,9 +751,7 @@ export async function handleMemberJoin(member) {
         suspicious
     ) {
         try {
-            if (
-                member.moderatable
-            ) {
+            if (member.moderatable) {
                 await member.timeout(
                     SECURITY_CONFIG.lockdown.timeoutMs,
                     'Fruity Security: Suspicious account during raid mode',
@@ -618,6 +762,13 @@ export async function handleMemberJoin(member) {
         }
     }
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Anti Nuke
+|--------------------------------------------------------------------------
+*/
 
 export async function handleNukeAction({
     guild,
@@ -758,6 +909,13 @@ export async function handleNukeAction({
     nukeActions.delete(key);
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Lockdown
+|--------------------------------------------------------------------------
+*/
+
 export async function lockdownGuild(guild) {
     await updateGuildConfig(
         guild.id,
@@ -772,7 +930,9 @@ export async function lockdownGuild(guild) {
         try {
             if (
                 channel.isTextBased() &&
-                channel.permissionsFor(guild.roles.everyone)?.has(
+                channel.permissionsFor(
+                    guild.roles.everyone,
+                )?.has(
                     PermissionFlagsBits.SendMessages,
                 )
             ) {
@@ -795,6 +955,13 @@ export async function lockdownGuild(guild) {
 
     return changed;
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Unlock
+|--------------------------------------------------------------------------
+*/
 
 export async function unlockGuild(guild) {
     await updateGuildConfig(
@@ -830,6 +997,13 @@ export async function unlockGuild(guild) {
 
     return changed;
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Security Scan
+|--------------------------------------------------------------------------
+*/
 
 export async function scanGuild(guild) {
     const problems = [];
@@ -892,11 +1066,18 @@ export async function scanGuild(guild) {
     }
 
     return {
-        rolesChecked: guild.roles.cache.size,
+        rolesChecked:
+            guild.roles.cache.size,
+
         dangerousRoles,
+
         dangerousPermissions,
+
         bots,
-        membersChecked: members.size,
+
+        membersChecked:
+            members.size,
+
         problems,
     };
 }
