@@ -80,6 +80,15 @@ registerSecurityEvents(client);
 
 registerInteractionEvents(client);
 
+client.user.setPresence({
+    status: 'dnd',
+    activities: [
+        {
+            name: 'Protecting Fruity',
+            type: 4,
+        },
+    ],
+});
 
 /*
 |--------------------------------------------------------------------------
