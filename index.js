@@ -80,15 +80,6 @@ registerSecurityEvents(client);
 
 registerInteractionEvents(client);
 
-client.user.setPresence({
-    status: 'dnd',
-    activities: [
-        {
-            name: 'Protecting Fruity',
-            type: 4,
-        },
-    ],
-});
 
 /*
 |--------------------------------------------------------------------------
@@ -97,6 +88,31 @@ client.user.setPresence({
 */
 
 client.once('ready', async () => {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bot Presence
+    |--------------------------------------------------------------------------
+    */
+
+    client.user.setPresence({
+        status: 'dnd',
+
+        activities: [
+            {
+                name: 'Protecting Fruity',
+                type: 4,
+            },
+        ],
+    });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Console Information
+    |--------------------------------------------------------------------------
+    */
+
     console.log('');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🛡️  FRUITY SECURITY');
@@ -126,7 +142,9 @@ client.once('ready', async () => {
     try {
         await startDatabase();
 
-        console.log('✅ PostgreSQL database connected.');
+        console.log(
+            '✅ PostgreSQL database connected.',
+        );
     } catch (error) {
         console.error(
             '❌ Failed to initialize PostgreSQL:',
@@ -144,7 +162,7 @@ client.once('ready', async () => {
     */
 
     try {
-        await registerCommands(client);
+        await registerCommands();
 
         console.log(
             '✅ Slash commands registered.',
