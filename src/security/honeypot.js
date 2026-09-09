@@ -242,7 +242,7 @@ async function sendHoneypotPanel(
                     text:
                         HONEYPOT_FOOTER,
                 })
-                .setTimestamp();
+                
 
 
         /*
