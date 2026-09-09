@@ -25,9 +25,13 @@ const NUKE_EVENTS = new Set([
 
 
 export function registerSecurityEvents(client) {
+
     /*
-     * Existing security message protection.
-     */
+    |--------------------------------------------------------------------------
+    | Existing Security Message Handler
+    |--------------------------------------------------------------------------
+    */
+
     client.on(
         'messageCreate',
         async (message) => {
@@ -44,18 +48,20 @@ export function registerSecurityEvents(client) {
 
 
     /*
-     * Honeypot protection.
-     *
-     * This intentionally has its own messageCreate
-     * listener so the existing security handler
-     * remains completely independent.
-     */
+    |--------------------------------------------------------------------------
+    | Automatic Honeypot
+    |--------------------------------------------------------------------------
+    */
+
     registerHoneypotEvents(client);
 
 
     /*
-     * Raid protection.
-     */
+    |--------------------------------------------------------------------------
+    | Anti-Raid
+    |--------------------------------------------------------------------------
+    */
+
     client.on(
         'guildMemberAdd',
         async (member) => {
@@ -72,8 +78,11 @@ export function registerSecurityEvents(client) {
 
 
     /*
-     * Anti-nuke protection.
-     */
+    |--------------------------------------------------------------------------
+    | Anti-Nuke
+    |--------------------------------------------------------------------------
+    */
+
     client.on(
         'guildAuditLogEntryCreate',
         async (entry, guild) => {
@@ -90,7 +99,8 @@ export function registerSecurityEvents(client) {
                     return;
                 }
 
-                let action = 'Unknown';
+                let action =
+                    'Unknown';
 
                 switch (entry.action) {
                     case AuditLogEvent.ChannelDelete:
@@ -131,9 +141,12 @@ export function registerSecurityEvents(client) {
 
                 await handleNukeAction({
                     guild,
+
                     userId:
                         entry.executorId,
+
                     action,
+
                     target:
                         entry.target?.name ||
                         entry.target?.id ||
