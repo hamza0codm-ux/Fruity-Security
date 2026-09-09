@@ -8,6 +8,11 @@ import {
     handleNukeAction,
 } from '../security/securityService.js';
 
+import {
+    registerHoneypotEvents,
+} from '../security/honeypot.js';
+
+
 const NUKE_EVENTS = new Set([
     AuditLogEvent.ChannelDelete,
     AuditLogEvent.ChannelCreate,
@@ -18,35 +23,65 @@ const NUKE_EVENTS = new Set([
     AuditLogEvent.MemberBanAdd,
 ]);
 
+
 export function registerSecurityEvents(client) {
-    client.on('messageCreate', async (message) => {
-        try {
-            await handleMessage(message);
-        } catch (error) {
-            console.error(
-                'Security message handler error:',
-                error,
-            );
-        }
-    });
+    /*
+     * Existing security message protection.
+     */
+    client.on(
+        'messageCreate',
+        async (message) => {
+            try {
+                await handleMessage(message);
+            } catch (error) {
+                console.error(
+                    'Security message handler error:',
+                    error,
+                );
+            }
+        },
+    );
 
-    client.on('guildMemberAdd', async (member) => {
-        try {
-            await handleMemberJoin(member);
-        } catch (error) {
-            console.error(
-                'Security join handler error:',
-                error,
-            );
-        }
-    });
 
+    /*
+     * Honeypot protection.
+     *
+     * This intentionally has its own messageCreate
+     * listener so the existing security handler
+     * remains completely independent.
+     */
+    registerHoneypotEvents(client);
+
+
+    /*
+     * Raid protection.
+     */
+    client.on(
+        'guildMemberAdd',
+        async (member) => {
+            try {
+                await handleMemberJoin(member);
+            } catch (error) {
+                console.error(
+                    'Security join handler error:',
+                    error,
+                );
+            }
+        },
+    );
+
+
+    /*
+     * Anti-nuke protection.
+     */
     client.on(
         'guildAuditLogEntryCreate',
         async (entry, guild) => {
             try {
                 if (
-                    !NUKE_EVENTS.has(entry.action)
+                    !NUKE_EVENTS.has(
+                        entry.action,
+                    )
                 ) {
                     return;
                 }
@@ -59,37 +94,45 @@ export function registerSecurityEvents(client) {
 
                 switch (entry.action) {
                     case AuditLogEvent.ChannelDelete:
-                        action = 'Channel deleted';
+                        action =
+                            'Channel deleted';
                         break;
 
                     case AuditLogEvent.ChannelCreate:
-                        action = 'Channel created';
+                        action =
+                            'Channel created';
                         break;
 
                     case AuditLogEvent.RoleDelete:
-                        action = 'Role deleted';
+                        action =
+                            'Role deleted';
                         break;
 
                     case AuditLogEvent.RoleCreate:
-                        action = 'Role created';
+                        action =
+                            'Role created';
                         break;
 
                     case AuditLogEvent.WebhookDelete:
-                        action = 'Webhook deleted';
+                        action =
+                            'Webhook deleted';
                         break;
 
                     case AuditLogEvent.WebhookCreate:
-                        action = 'Webhook created';
+                        action =
+                            'Webhook created';
                         break;
 
                     case AuditLogEvent.MemberBanAdd:
-                        action = 'Member banned';
+                        action =
+                            'Member banned';
                         break;
                 }
 
                 await handleNukeAction({
                     guild,
-                    userId: entry.executorId,
+                    userId:
+                        entry.executorId,
                     action,
                     target:
                         entry.target?.name ||
