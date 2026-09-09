@@ -5,7 +5,6 @@ import {
 } from 'discord.js';
 
 import {
-    getGuildConfig,
     getStats,
     addWhitelist,
     removeWhitelist,
@@ -17,13 +16,6 @@ import {
     unlockGuild,
     scanGuild,
 } from '../security/securityService.js';
-
-import {
-    setupHoneypot,
-    findHoneypot,
-    getHoneypotAction,
-    disableHoneypot,
-} from '../security/honeypot.js';
 
 
 export default {
@@ -98,75 +90,6 @@ export default {
                         )
                         .setRequired(true),
                 ),
-        )
-
-        .addSubcommandGroup((group) =>
-            group
-                .setName('honeypot')
-                .setDescription(
-                    'Manage the Fruity Security honeypot.',
-                )
-
-                .addSubcommand((subcommand) =>
-                    subcommand
-                        .setName('setup')
-                        .setDescription(
-                            'Configure a honeypot channel.',
-                        )
-                        .addChannelOption((option) =>
-                            option
-                                .setName('channel')
-                                .setDescription(
-                                    'Channel to use as the honeypot.',
-                                )
-                                .addChannelTypes(
-                                    0,
-                                )
-                                .setRequired(true),
-                        )
-                        .addStringOption((option) =>
-                            option
-                                .setName('action')
-                                .setDescription(
-                                    'Action to take when triggered.',
-                                )
-                                .setRequired(true)
-                                .addChoices(
-                                    {
-                                        name: 'Log only',
-                                        value: 'log',
-                                    },
-                                    {
-                                        name: '1 week timeout',
-                                        value: 'timeout',
-                                    },
-                                    {
-                                        name: 'Kick',
-                                        value: 'kick',
-                                    },
-                                    {
-                                        name: 'Ban',
-                                        value: 'ban',
-                                    },
-                                ),
-                        ),
-                )
-
-                .addSubcommand((subcommand) =>
-                    subcommand
-                        .setName('status')
-                        .setDescription(
-                            'View honeypot status.',
-                        ),
-                )
-
-                .addSubcommand((subcommand) =>
-                    subcommand
-                        .setName('disable')
-                        .setDescription(
-                            'Disable the honeypot.',
-                        ),
-                ),
         ),
 
     async execute(interaction) {
@@ -190,36 +113,37 @@ export default {
             });
         }
 
-        const group =
-            interaction.options.getSubcommandGroup();
-
-        if (group === 'honeypot') {
-            return handleHoneypotCommand(
-                interaction,
-            );
-        }
-
         const subcommand =
             interaction.options.getSubcommand();
 
         if (subcommand === 'status') {
-            return showStatus(interaction);
+            return showStatus(
+                interaction,
+            );
         }
 
         if (subcommand === 'scan') {
-            return runScan(interaction);
+            return runScan(
+                interaction,
+            );
         }
 
         if (subcommand === 'lockdown') {
-            return runLockdown(interaction);
+            return runLockdown(
+                interaction,
+            );
         }
 
         if (subcommand === 'unlock') {
-            return runUnlock(interaction);
+            return runUnlock(
+                interaction,
+            );
         }
 
         if (subcommand === 'whitelist') {
-            return runWhitelist(interaction);
+            return runWhitelist(
+                interaction,
+            );
         }
 
         if (subcommand === 'unwhitelist') {
@@ -231,219 +155,15 @@ export default {
 };
 
 
-/**
- * Handle /security honeypot ...
- */
-async function handleHoneypotCommand(
+/*
+|--------------------------------------------------------------------------
+| Status
+|--------------------------------------------------------------------------
+*/
+
+async function showStatus(
     interaction,
 ) {
-    const subcommand =
-        interaction.options.getSubcommand();
-
-    if (subcommand === 'setup') {
-        return setupHoneypotCommand(
-            interaction,
-        );
-    }
-
-    if (subcommand === 'status') {
-        return honeypotStatusCommand(
-            interaction,
-        );
-    }
-
-    if (subcommand === 'disable') {
-        return disableHoneypotCommand(
-            interaction,
-        );
-    }
-}
-
-
-/**
- * Configure the honeypot.
- */
-async function setupHoneypotCommand(
-    interaction,
-) {
-    const channel =
-        interaction.options.getChannel(
-            'channel',
-            true,
-        );
-
-    const action =
-        interaction.options.getString(
-            'action',
-            true,
-        );
-
-    try {
-        await setupHoneypot(
-            interaction.guild,
-            channel,
-            action,
-        );
-
-        return interaction.reply({
-            content:
-                `🍯 **Honeypot configured.**\n\n` +
-                `Channel: ${channel}\n` +
-                `Action: **${getActionName(action)}**\n\n` +
-                `Anyone who triggers it will have their messages from today deleted across the server.`,
-            ephemeral: true,
-        });
-    } catch (error) {
-        console.error(
-            'Honeypot setup error:',
-            error,
-        );
-
-        return interaction.reply({
-            content:
-                `❌ Could not configure the honeypot.\n\n` +
-                `\`${error.message || 'Unknown error'}\``,
-            ephemeral: true,
-        });
-    }
-}
-
-
-/**
- * Honeypot status.
- */
-async function honeypotStatusCommand(
-    interaction,
-) {
-    const channel =
-        findHoneypot(
-            interaction.guild,
-        );
-
-    if (!channel) {
-        return interaction.reply({
-            content:
-                '🍯 **Honeypot:** Disabled\n\nNo honeypot channel is currently configured.',
-            ephemeral: true,
-        });
-    }
-
-    const action =
-        getHoneypotAction(channel);
-
-    const embed =
-        new EmbedBuilder()
-            .setTitle(
-                '🍯 Fruity Security Honeypot',
-            )
-            .setDescription(
-                'The honeypot is currently active.',
-            )
-            .addFields(
-                {
-                    name: '📍 Channel',
-                    value:
-                        `${channel}`,
-                    inline: true,
-                },
-                {
-                    name: '⚡ Action',
-                    value:
-                        `**${getActionName(action)}**`,
-                    inline: true,
-                },
-                {
-                    name: '🗑️ Cleanup',
-                    value:
-                        'Deletes the triggered user\'s messages from today across accessible server channels.',
-                    inline: false,
-                },
-                {
-                    name: '📢 Alert Channel',
-                    value:
-                        `<#1547202840785723412>`,
-                    inline: false,
-                },
-            )
-            .setFooter({
-                text:
-                    'Fruity Security • Honeypot',
-            })
-            .setTimestamp();
-
-    return interaction.reply({
-        embeds: [embed],
-        ephemeral: true,
-    });
-}
-
-
-/**
- * Disable the honeypot.
- */
-async function disableHoneypotCommand(
-    interaction,
-) {
-    try {
-        const disabled =
-            await disableHoneypot(
-                interaction.guild,
-            );
-
-        if (!disabled) {
-            return interaction.reply({
-                content:
-                    '🍯 The honeypot is already disabled.',
-                ephemeral: true,
-            });
-        }
-
-        return interaction.reply({
-            content:
-                '✅ **Fruity Security honeypot disabled.**',
-            ephemeral: true,
-        });
-    } catch (error) {
-        console.error(
-            'Honeypot disable error:',
-            error,
-        );
-
-        return interaction.reply({
-            content:
-                `❌ Could not disable the honeypot.\n\n` +
-                `\`${error.message || 'Unknown error'}\``,
-            ephemeral: true,
-        });
-    }
-}
-
-
-/**
- * Friendly action names.
- */
-function getActionName(action) {
-    switch (action) {
-        case 'timeout':
-            return '1 Week Timeout';
-
-        case 'kick':
-            return 'Kick';
-
-        case 'ban':
-            return 'Ban';
-
-        case 'log':
-        default:
-            return 'Log Only';
-    }
-}
-
-
-/**
- * Security status.
- */
-async function showStatus(interaction) {
     const stats =
         await getStats(
             interaction.guild.id,
@@ -452,11 +172,6 @@ async function showStatus(interaction) {
     const whitelist =
         await getWhitelist(
             interaction.guild.id,
-        );
-
-    const honeypot =
-        findHoneypot(
-            interaction.guild,
         );
 
     const embed =
@@ -473,15 +188,8 @@ async function showStatus(interaction) {
                     value:
                         `${stats.enabled ? '🟢 Protection Active' : '🔴 Protection Disabled'}\n` +
                         `${stats.lockdown ? '🔴 Lockdown Active' : '🟢 Lockdown Disabled'}\n` +
-                        `${stats.raid_mode ? '🔴 Raid Mode Active' : '🟢 Raid Mode Inactive'}`,
-                    inline: false,
-                },
-                {
-                    name: '🍯 HONEYPOT',
-                    value:
-                        honeypot
-                            ? `🟢 Active — ${honeypot}`
-                            : '🔴 Disabled',
+                        `${stats.raid_mode ? '🔴 Raid Mode Active' : '🟢 Raid Mode Inactive'}\n` +
+                        `🍯 Honeypot: **Active**`,
                     inline: false,
                 },
                 {
@@ -524,10 +232,15 @@ async function showStatus(interaction) {
 }
 
 
-/**
- * Run security scan.
- */
-async function runScan(interaction) {
+/*
+|--------------------------------------------------------------------------
+| Scan
+|--------------------------------------------------------------------------
+*/
+
+async function runScan(
+    interaction,
+) {
     await interaction.deferReply({
         ephemeral: true,
     });
@@ -607,10 +320,15 @@ async function runScan(interaction) {
 }
 
 
-/**
- * Lockdown.
- */
-async function runLockdown(interaction) {
+/*
+|--------------------------------------------------------------------------
+| Lockdown
+|--------------------------------------------------------------------------
+*/
+
+async function runLockdown(
+    interaction,
+) {
     await interaction.deferReply({
         ephemeral: true,
     });
@@ -628,10 +346,15 @@ async function runLockdown(interaction) {
 }
 
 
-/**
- * Unlock.
- */
-async function runUnlock(interaction) {
+/*
+|--------------------------------------------------------------------------
+| Unlock
+|--------------------------------------------------------------------------
+*/
+
+async function runUnlock(
+    interaction,
+) {
     await interaction.deferReply({
         ephemeral: true,
     });
@@ -649,10 +372,15 @@ async function runUnlock(interaction) {
 }
 
 
-/**
- * Whitelist.
- */
-async function runWhitelist(interaction) {
+/*
+|--------------------------------------------------------------------------
+| Whitelist
+|--------------------------------------------------------------------------
+*/
+
+async function runWhitelist(
+    interaction,
+) {
     const user =
         interaction.options.getUser(
             'user',
@@ -672,9 +400,12 @@ async function runWhitelist(interaction) {
 }
 
 
-/**
- * Unwhitelist.
- */
+/*
+|--------------------------------------------------------------------------
+| Unwhitelist
+|--------------------------------------------------------------------------
+*/
+
 async function runUnwhitelist(
     interaction,
 ) {
