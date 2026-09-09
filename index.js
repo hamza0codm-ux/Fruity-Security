@@ -85,9 +85,13 @@ registerInteractionEvents(client);
 |--------------------------------------------------------------------------
 | Bot Ready
 |--------------------------------------------------------------------------
+|
+| Discord.js v14.16+ recommends clientReady instead
+| of the deprecated ready event name.
+|
 */
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
 
     /*
     |--------------------------------------------------------------------------
@@ -188,6 +192,7 @@ client.once('ready', async () => {
     console.log('💬 Anti-Spam: ACTIVE');
     console.log('🚨 Anti-Raid: ACTIVE');
     console.log('☢️ Anti-Nuke: ACTIVE');
+    console.log('🍯 Honeypot: READY');
     console.log('🔒 Lockdown: READY');
     console.log('🔍 Security Scan: READY');
     console.log('👮 Whitelist: READY');
