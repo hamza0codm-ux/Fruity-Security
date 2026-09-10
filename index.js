@@ -80,9 +80,13 @@ const client = new Client({
 |--------------------------------------------------------------------------
 */
 
-registerSecurityEvents(client);
+registerSecurityEvents(
+    client,
+);
 
-registerInteractionEvents(client);
+registerInteractionEvents(
+    client,
+);
 
 
 /*
@@ -91,136 +95,187 @@ registerInteractionEvents(client);
 |--------------------------------------------------------------------------
 */
 
-client.once('clientReady', async () => {
+client.once(
+    'ready',
+    async () => {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Bot Presence
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Bot Presence
+        |--------------------------------------------------------------------------
+        */
 
-    client.user.setPresence({
-        status: 'dnd',
+        client.user.setPresence({
+            status: 'dnd',
 
-        activities: [
-            {
-                name: 'Protecting Fruity',
-                type: 4,
-            },
-        ],
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Console Information
-    |--------------------------------------------------------------------------
-    */
-
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🛡️  FRUITY SECURITY');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-    console.log(
-        `👤 Logged in as: ${client.user.tag}`,
-    );
-
-    console.log(
-        `🆔 Bot ID: ${client.user.id}`,
-    );
-
-    console.log(
-        `🏠 Servers: ${client.guilds.cache.size}`,
-    );
-
-    console.log('');
+            activities: [
+                {
+                    name: 'Protecting Fruity',
+                    type: 4,
+                },
+            ],
+        });
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Database
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Console Information
+        |--------------------------------------------------------------------------
+        */
 
-    try {
-        await startDatabase();
+        console.log('');
 
         console.log(
-            '✅ PostgreSQL database connected.',
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
         );
-    } catch (error) {
-        console.error(
-            '❌ Failed to initialize PostgreSQL:',
-            error,
-        );
-
-        process.exit(1);
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Slash Commands
-    |--------------------------------------------------------------------------
-    */
-
-    try {
-        await registerCommands();
 
         console.log(
-            '✅ Slash commands registered.',
+            '🛡️ FRUITY SECURITY',
         );
-    } catch (error) {
-        console.error(
-            '❌ Failed to register slash commands:',
-            error,
+
+        console.log(
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
         );
-    }
+
+        console.log(
+            `👤 Logged in as: ${client.user.tag}`,
+        );
+
+        console.log(
+            `🆔 Bot ID: ${client.user.id}`,
+        );
+
+        console.log(
+            `🏠 Servers: ${client.guilds.cache.size}`,
+        );
+
+        console.log('');
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Automatic Honeypot Panels
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Database
+        |--------------------------------------------------------------------------
+        */
 
-    try {
-        for (const guild of client.guilds.cache.values()) {
-            await ensureHoneypotPanel(guild);
+        try {
+            await startDatabase();
+
+            console.log(
+                '✅ PostgreSQL database connected.',
+            );
+
+        } catch (error) {
+            console.error(
+                '❌ Failed to initialize PostgreSQL:',
+                error,
+            );
+
+            process.exit(1);
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Slash Commands
+        |--------------------------------------------------------------------------
+        */
+
+        try {
+            await registerCommands();
+
+            console.log(
+                '✅ Slash commands registered.',
+            );
+
+        } catch (error) {
+            console.error(
+                '❌ Failed to register slash commands:',
+                error,
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Automatic Honeypot Panel
+        |--------------------------------------------------------------------------
+        */
+
+        try {
+            for (
+                const guild of client.guilds.cache.values()
+            ) {
+                await ensureHoneypotPanel(
+                    guild,
+                );
+            }
+
+            console.log(
+                '🍯 Honeypot panel ready.',
+            );
+
+        } catch (error) {
+            console.error(
+                '❌ Failed to initialize honeypot panel:',
+                error,
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Security Status
+        |--------------------------------------------------------------------------
+        */
+
+        console.log('');
+
         console.log(
-            '🍯 Honeypot panel ready.',
+            '🛡️ Fruity Security is ONLINE.',
         );
-    } catch (error) {
-        console.error(
-            '❌ Failed to create/update honeypot panel:',
-            error,
+
+        console.log('');
+
+        console.log(
+            '🔗 Anti-Phishing: ACTIVE',
         );
-    }
 
+        console.log(
+            '💬 Anti-Spam: ACTIVE',
+        );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Ready
-    |--------------------------------------------------------------------------
-    */
+        console.log(
+            '🚨 Anti-Raid: ACTIVE',
+        );
 
-    console.log('');
-    console.log('🛡️ Fruity Security is ONLINE.');
-    console.log('');
-    console.log('🔗 Anti-Phishing: ACTIVE');
-    console.log('💬 Anti-Spam: ACTIVE');
-    console.log('🚨 Anti-Raid: ACTIVE');
-    console.log('☢️ Anti-Nuke: ACTIVE');
-    console.log('🍯 Honeypot: ACTIVE');
-    console.log('🔒 Lockdown: READY');
-    console.log('🔍 Security Scan: READY');
-    console.log('👮 Whitelist: READY');
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-});
+        console.log(
+            '☢️ Anti-Nuke: ACTIVE',
+        );
+
+        console.log(
+            '🍯 Honeypot: ACTIVE',
+        );
+
+        console.log(
+            '🔒 Lockdown: READY',
+        );
+
+        console.log(
+            '🔍 Security Scan: READY',
+        );
+
+        console.log(
+            '👮 Whitelist: READY',
+        );
+
+        console.log('');
+
+        console.log(
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        );
+    },
+);
 
 
 /*
@@ -238,6 +293,7 @@ process.on(
         );
     },
 );
+
 
 process.on(
     'uncaughtException',
