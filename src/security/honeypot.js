@@ -35,11 +35,27 @@ const HONEYPOT_FOOTER =
 
 /*
 |--------------------------------------------------------------------------
+| Prevent duplicate event registration
+|--------------------------------------------------------------------------
+|
+| This protects against registerHoneypotEvents() accidentally being
+| called more than once for the same Discord client.
+|
+*/
+
+const registeredHoneypotClients =
+    new WeakSet();
+
+
+/*
+|--------------------------------------------------------------------------
 | Find honeypot channel
 |--------------------------------------------------------------------------
 */
 
-export async function findHoneypot(guild) {
+export async function findHoneypot(
+    guild,
+) {
     if (!guild) {
         return null;
     }
@@ -77,7 +93,9 @@ export async function findHoneypot(guild) {
 |--------------------------------------------------------------------------
 */
 
-export function isHoneypotChannel(channel) {
+export function isHoneypotChannel(
+    channel,
+) {
     if (!channel) {
         return false;
     }
@@ -242,7 +260,7 @@ async function sendHoneypotPanel(
                     text:
                         HONEYPOT_FOOTER,
                 })
-                
+                .setTimestamp();
 
 
         /*
@@ -313,7 +331,9 @@ function getStartOfToday() {
 |--------------------------------------------------------------------------
 */
 
-function getMessageChannels(guild) {
+function getMessageChannels(
+    guild,
+) {
     return [
         ...guild.channels.cache.values(),
     ].filter(
@@ -816,7 +836,6 @@ export async function handleHoneypotMessage(
     |--------------------------------------------------------------------------
     | Ignore bots
     |--------------------------------------------------------------------------
-
     */
 
     if (message.author.bot) {
@@ -881,7 +900,7 @@ export async function handleHoneypotMessage(
 
     /*
     |--------------------------------------------------------------------------
-    | Delete the trigger message
+    | Delete trigger message
     |--------------------------------------------------------------------------
     */
 
@@ -1000,7 +1019,7 @@ export async function handleHoneypotMessage(
     |--------------------------------------------------------------------------
     */
 
-    console.warn(
+    console.log(
         `[HONEYPOT] ${message.author.tag} (${message.author.id}) triggered the honeypot. ` +
         `Timeout attempted first. Deleted ${deletedCount} messages across ${scannedChannels} channels.`,
     );
@@ -1016,6 +1035,41 @@ export async function handleHoneypotMessage(
 export function registerHoneypotEvents(
     client,
 ) {
+    if (!client) {
+        return;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent duplicate registration
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        registeredHoneypotClients.has(
+            client,
+        )
+    ) {
+        console.log(
+            '🍯 Honeypot events already registered. Skipping duplicate registration.',
+        );
+
+        return;
+    }
+
+
+    registeredHoneypotClients.add(
+        client,
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Message listener
+    |--------------------------------------------------------------------------
+    */
+
     client.on(
         'messageCreate',
         async (message) => {
@@ -1030,5 +1084,10 @@ export function registerHoneypotEvents(
                 );
             }
         },
+    );
+
+
+    console.log(
+        '🍯 Honeypot message listener registered.',
     );
 }
